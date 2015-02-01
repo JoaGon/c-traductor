@@ -24,9 +24,13 @@
 	void define_variable(char *, char *);
 	void report_not_declared_variable(char*);
 	void report_declared_variable(char*);
+	void ts_op_insert(char* nombre);
+	void report_conflicting_types();
+	void report_conflicting_asignment();
 
 /* Tabla de símbolos: Lista de nodos tipo token. */
 	token *ts;
+	token *ts_op;
 %}
 
 /*************************
@@ -145,8 +149,10 @@ sentencia 	: declaracion FININST 	{ $$ = malloc(strlen($1) + 2); strcpy($$,$1); 
 		| leer			{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); }
 		| decision 		{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); }
 		| repeticion 		{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); }
-		| operacion FININST 	{ $$ = malloc(strlen($1) + 2); strcpy($$,$1); strcat($$,";"); }
-		| operacion COMA 	{ $$ = malloc(strlen($1) + 2); strcpy($$,$1); strcat($$,";"); report_coma(); }
+		| operacion FININST 	{
+						$$ = malloc(strlen($1) + 2); strcpy($$,$1); strcat($$,";");deleteTS(ts_op); ts_op=NULL;
+					}
+		| operacion COMA 	{ $$ = malloc(strlen($1) + 2); strcpy($$,$1); strcat($$,";"); report_coma();}
 		| formatos		{ $$ = malloc(strlen($1) + 1); strcpy($$,$1);}	
 		| error FININST		{ $$ = report_syntax_error();}
 		| error SALTO		{ $$ = report_syntax_error();};
@@ -162,17 +168,27 @@ declaracion 	: tipo ID 		{
 						$$ = malloc(strlen($1) + strlen($2) + 2);
 						strcpy($$,$1); strcat($$," "); strcat($$,$2);
 						define_variable($1,$2);
-						
 					};
 
 tipo		: ENTERO 		{ $$ = malloc(strlen("int") + 1); strcpy($$,"int");}
 		| REAL			{ $$ = malloc(strlen("float") + 1); strcpy($$,"float"); }
 		| CARACTER		{ $$ = malloc(strlen("char") + 1); strcpy($$,"char"); };
 
-operacion 	: op_arit 		{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); }
-		| op_log		{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); }
-		| asignacion		{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); };
-
+operacion 	: op_arit 	{	$$ = malloc(strlen($1) + 1); strcpy($$,$1); 
+					if(check_equal_types(ts_op) == 0){ //si hay tipos distintos en la operacion
+							report_conflicting_types();
+					} 
+				}
+		| op_log 	{	$$ = malloc(strlen($1) + 1); strcpy($$,$1); 
+					if(check_equal_types(ts_op) == 0){ //si hay tipos distintos en la operacion
+							report_conflicting_types();
+					} 
+				}
+		| asignacion 	{	$$ = malloc(strlen($1) + 1); strcpy($$,$1); 
+					if(check_equal_types(ts_op) == 0){ //si hay tipos distintos en la operacion
+							report_conflicting_asignment();
+					} 
+				};
 
 op_arit		: var_const			{ $$ = malloc(strlen($1) + 1); strcpy($$,$1);}
 		| op_arit operador_a op_arit 	{ $$ = malloc(strlen($1) + strlen($2) + strlen($3) + 1);
@@ -187,17 +203,22 @@ operador_a	: SUMA 			{ $$ = malloc(strlen(" + ") + 1); strcpy($$," + "); }
 		| MULT 			{ $$ = malloc(strlen(" * ") + 1); strcpy($$," * "); }
 		| DIV 			{ $$ = malloc(strlen(" / ") + 1); strcpy($$," / "); };			
 
-var_const	: ID 		{ 	int type = get_type(ts, $1);
-					if( type != 0){
+var_const	: ID 		{
+					int type = get_type(ts, $1);
+					if( type != 0){/*Si si existe el token*/
+						ts_op = putToken(ts_op,$1, type);
 						$$ = malloc(strlen($1) + 1); strcpy($$,$1);
 					}else{
 						report_not_declared_variable($1);
 						$$ = "";			
 					}
 				}
-		| NUM 			{ $$ = malloc(strlen($1) + 1); strcpy($$,$1);};
+		| NUM 			{
+						ts_op_insert($1);
+						$$ = malloc(strlen($1) + 1); strcpy($$,$1);
+					};
 
-op_log		: op_log operador_log var_const	{ $$ = malloc(strlen($1) + strlen($2) + strlen($3) + 1); //op_log
+op_log		: op_log operador_log op_log	{ $$ = malloc(strlen($1) + strlen($2) + strlen($3) + 1); //op_log
 							strcpy($$,$1); strcat($$,$2); strcat($$,$3); }
 		| var_const			{ $$ = malloc(strlen($1) + 1); strcpy($$,$1); }
 		| PAR_IZQ op_log PAR_DER	{ $$ = malloc(strlen("(") + strlen($2) + strlen(")") + 1);
@@ -217,7 +238,8 @@ operador_log	: MENOR			{ $$ = malloc(strlen(" < ") + 1); strcpy($$," < "); }
 asignacion	: ID IGUAL operacion 	{	int type = get_type(ts, $1);
 						if( type != 0){
 							$$ = malloc(strlen($1) + strlen(" = ") + strlen($3) + 1);
-								strcpy($$,$1); strcat($$," = "); strcat($$,$3);
+							strcpy($$,$1); strcat($$," = "); strcat($$,$3);
+							ts_op = putToken(ts_op,$1, type);
 						}else{
 							report_not_declared_variable($1);
 							$$ = "";			
@@ -318,6 +340,27 @@ void report_not_declared_variable(char* var){
 	semantic_error_flag = semantic_error_flag + 1;
 }
 
+void report_conflicting_types(){
+	printf("\nAdvertencia un error semantico en la linea %d",linea);
+	printf(", está haciendo una operacion con tipos de datos diferentes\n");
+}
+
+void report_conflicting_asignment(){
+	printf("\nAdvertencia un error semantico en la linea %d",linea);
+	printf(", está haciendo una asignacion con tipos de datos diferentes\n");
+}
+
+void ts_op_insert(char* nombre){
+	if(getToken(ts_op,nombre) == NULL){
+		if(strchr(nombre, '.') != NULL){
+			ts_op = putToken(ts_op,nombre,FLOAT);
+		}
+		else{
+			ts_op = putToken(ts_op,nombre,INT);
+		}
+	}
+}
+
 void define_variable(char* tipo, char* nombre){
 	if(getToken(ts,nombre) == NULL){
 		if(strcmp(tipo,"int") == 0){
@@ -335,7 +378,6 @@ void define_variable(char* tipo, char* nombre){
 	}
 }
 
-
 int main(int argc,char **argv){
 	yydebug = 0;
 	linea = 1;
@@ -346,9 +388,8 @@ int main(int argc,char **argv){
 		yyin=fopen("entrada.txt","rt");
 		
 	yyout = fopen("salida.c","w");
-	ts = init_table(ts);
 	yyparse();
-	showTS(ts);
 	deleteTS(ts);
+
 	return 0;
 }
