@@ -23,6 +23,18 @@ void deleteTS(token*);
 void showTS(token*);
 int get_type(token*, char *);
 char* get_identifier_by_type(int);
+int check_equal_types(token*);
+
+int check_equal_types(token* ts){
+	token *ptr;
+	int type;
+	if(ts != NULL){type = ts->tipo;} //si la tabla de simbolos no esta vacia
+	for (ptr = ts; ptr != NULL; ptr = ptr->next){
+	if (type != ptr->tipo)		//si tipo inicial es diferente de tipo actual
+		return 0; 
+	}
+	return 1;	//si son de igual tipo todos los tokens, si ts es NULL tambien entonces retorna 0
+}
 
 char* get_identifier_by_type(int type){
 	switch(type){
@@ -52,7 +64,7 @@ void showTS(token* ts) {
    
    printf("\nTokens almacenados en la tabla de símbolos <TIPO, NOMBRE>:\n");
    
-   while(ptr != (token *) 0) {
+   while(ptr != NULL) {
 
 	if(ptr->tipo == INT)
 		printf("<  ENTERO , %s >", ptr->nombre);
@@ -92,7 +104,7 @@ token * putToken (token* ts, char *name, int type) {
 
 token * getToken (token* ts, char *name) {
    token *ptr;
-   for (ptr = ts; ptr != (token *) 0; ptr = (token *)ptr->next){
+   for (ptr = ts; ptr != NULL; ptr = ptr->next){
       if (strcmp (ptr->nombre, name) == 0)
          return ptr;
    }
@@ -100,16 +112,13 @@ token * getToken (token* ts, char *name) {
 }
 
 void deleteTS(token* ts) {
-   token *ptr;
-   
-   while(ts != (token *) 0) {
-      ptr = ts->next;
-      free(ts);
-      ts = ptr;
-   }
+	token *ptr = ts;
+	
+	while(ptr != NULL) {
+		ptr = ptr->next;
+		ts->next=NULL;
+		free(ts);
+		ts = ptr;
+   	}
+	ts=NULL;
 }
-
-
-
-
-
