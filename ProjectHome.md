@@ -1,0 +1,1 @@
+Traductor de pseudocódigo al lenguaje C, utiliza flex como analizador léxico y bison como analizador sintáctico/semántico.
